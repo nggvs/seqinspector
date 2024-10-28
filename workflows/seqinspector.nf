@@ -4,6 +4,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
+include { SEQTK_SAMPLE           } from '../modules/nf-core/seqtk/sample/main'
 include { FASTQC                 } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { paramsSummaryMap       } from 'plugin/nf-validation'
@@ -28,10 +29,23 @@ workflow SEQINSPECTOR {
     ch_multiqc_files = Channel.empty()
 
     //
+    // MODULE: Run Seqkit sample to perform subsampling
+    //
+    if (params.sample_size) {
+        ch_sample_sized = SEQTK_SAMPLE(ch_samplesheet.map {
+            meta, reads -> [meta, reads, params.sample_size]
+        }).reads
+        ch_versions = ch_versions.mix(SEQTK_SAMPLE.out.versions.first())
+    } else {
+        // No do subsample
+        ch_sample_sized = ch_samplesheet
+    }
+
+    //
     // MODULE: Run FastQC
     //
     FASTQC (
-        ch_samplesheet
+        ch_sample_sized
     )
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})
     ch_versions = ch_versions.mix(FASTQC.out.versions.first())
